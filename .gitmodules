@@ -1,0 +1,6 @@
+[submodule "3rd/asio"]
+	path = 3rd/asio
+	url = git@github.com:chriskohlhoff/asio.git
+[submodule "3rd/hiredis"]
+	path = 3rd/hiredis
+	url = git@github.com:redis/hiredis.git

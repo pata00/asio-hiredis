@@ -1,0 +1,10 @@
+*.o
+*.d
+*.a
+*.so
+tests/bench_client_callback
+tests/bench_client_coroutine
+tests/bench_pool
+tests/test_client
+tests/test_dev
+tests/test_pool

@@ -1,23 +1,35 @@
 libs := ../3rd/hiredis/libhiredis.a -lfmt
 
-test_srcs := $(wildcard *.cpp)
+srcs := $(wildcard *.cpp)
 
-test_targets := $(patsubst %.cpp, %, $(test_srcs))
+depends := $(patsubst %.cpp, %.d, $(srcs))
+
+targets := $(patsubst %.cpp, %, $(srcs))
 
 
-CXX_FLAGS := -std=c++20 -I ../3rd/asio/asio/include -I ../3rd/hiredis -I ../src ../3rd/hiredis/libhiredis.a -pthread -O2 -pipe -s
+CXXFLAGS := -std=c++20 -I ../3rd/asio/asio/include -I ../3rd/hiredis -I ../src -pthread -O2 -g
 
 ifeq ($(shell uname -s), Linux)
         CXX=g++-10
-        CXX_FLAGS += -fcoroutines
+        CXXFLAGS += -fcoroutines
 endif
 
 .PHONY: all clean build_lib
 
-all :$(test_targets)
+all :$(targets)
 
-$(test_targets) : %: %.cpp $(libs)
-	$(CXX) $(CXX_FLAGS) $< $(libs) -o $@ -s
+$(targets) : %: %.cpp $(libs)
+	$(CXX) $(CXXFLAGS) $< $(libs) -o $@ -s
 
 clean:
-	rm -fr $(test_targets)
+	rm -fr $(targets) $(depends)
+
+
+$(depends): %.d: %.cpp
+	@rm -fr $@
+	@echo build dep $<
+	@$(CXX) $(CXXFLAGS) -MM $< -MT $(<:.cpp=.o) -MF $@
+
+ifneq ($(MAKECMDGOALS), clean)
+-include $(depends)
+endif

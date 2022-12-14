@@ -8,10 +8,6 @@
 
 #include "asio_hiredis/client.h"
 
-#include "asio_hiredis/client.cpp"
-
 #include "asio_hiredis/pool.h"
-
-#include "asio_hiredis/pool.cpp"
 
 #endif

@@ -2,7 +2,7 @@
 
 #include "asio_hiredis/client.h"
 
-int main(){
+int main() {
 
     asio::io_context io;
 

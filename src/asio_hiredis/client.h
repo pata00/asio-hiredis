@@ -444,6 +444,7 @@ namespace ahedis {
             // TODO 是否只有异常断开会触发此错误
             if (status == REDIS_OK) {
                 socket_.async_wait(asio::ip::tcp::socket::wait_error, asio::bind_executor(strand_, [this, self = shared_from_this()](asio::error_code ec) {
+					(void)this;
                                        ASIO_HIREDIS_CLIENT_DEBUG(debug_object_id_, "END===========wait_error %d, %s\n", ec.value(), ec.message().c_str());
                                        // assert(false);
                                    }));

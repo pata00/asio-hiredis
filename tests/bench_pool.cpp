@@ -143,8 +143,8 @@ int main(int argc, char* argv[]) {
         t.join();
     }
 
-    for (int i = 0; i < run_statics.size(); ++i) {
-        printf("run_statics [%02d] %d\n", i, run_statics.at(i));
+    for (std::size_t i = 0; i < run_statics.size(); ++i) {
+        printf("run_statics [%02d] %d\n", (int)i, run_statics.at(i));
     }
 
     return 0;

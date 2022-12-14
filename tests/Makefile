@@ -6,7 +6,7 @@ depends := $(patsubst %.cpp, %.d, $(srcs))
 
 targets := $(patsubst %.cpp, %, $(srcs))
 
-CXXFLAGS := -std=c++20 -I ../3rd/asio/asio/include -I ../3rd/hiredis -I ../src -pthread -O0 -g
+CXXFLAGS := -Wall -Wextra -Wno-unused-variable -Wno-unused-parameter -Wno-unused-lambda-capture -Wno-deprecated-declarations -std=c++20 -I ../3rd/asio/asio/include -I ../src -I /usr/local/include/hiredis -pthread -O0 -g
 
 ifeq ($(shell uname -s), Linux)
         CXX=g++-10
@@ -18,7 +18,7 @@ endif
 all :$(targets)
 
 $(targets) : %: %.cpp
-	$(CXX) $(CXXFLAGS) $< $(libs) -o $@ -s
+	$(CXX) $(CXXFLAGS) $< $(libs) -o $@
 
 clean:
 	rm -fr $(targets) $(depends)

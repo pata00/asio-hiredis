@@ -67,6 +67,10 @@ namespace ahedis {
             ASIO_HIREDIS_CLIENT_DEBUG(debug_object_id_, "destructor \n");
         }
 
+        asio::io_context& io() {
+            return io_;
+        }
+
         asio::io_context::strand& strand() {
             return strand_;
         }

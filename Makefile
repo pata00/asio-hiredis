@@ -7,16 +7,20 @@
 target := libasio_hiredis.a libasio_hiredis.so
 INCDIR := -I ./3rd/asio/asio/include -I ./3rd/hiredis -I ./src
 
-CXXFLAGS := -Wall -Wextra -Wno-unused-variable -Wno-unused-function -Wno-unused-but-set-variable -Wno-unused-parameter -pipe -fPIC -std=c++20 -g -O3 -pthread #-DENABLE_ASIO_HIREDIS_CLIENT_DEBUG
-#CXXFLAGS := -Wall -Wextra -Wno-unused-variable -Wno-unused-function -Wno-unused-but-set-variable -Wno-unused-parameter -pipe -std=c++20 -g -O0 -pthread # -DASIO_ENABLE_HANDLER_TRACKING
+WARNING_CONFIG := -Wall -Wextra -Wno-unused-variable -Wno-unused-function -Wno-unused-but-set-variable -Wno-unused-parameter
+CXXFLAGS := -fPIC -std=c++20 -g -O2 -pthread #-DENABLE_ASIO_HIREDIS_CLIENT_DEBUG -DASIO_ENABLE_HANDLER_TRACKING
 
 LDFLAGS := -lfmt -pthread
 
-ifeq ($(shell uname -s), Linux)
+OS := $(shell uname -s)
+ifeq ($(OS), Linux)
 	CXX=g++-10
 	CXXFLAGS += -fcoroutines
+else ifeq ($(OS), Darwin)
+	WARNING_CONFIG += -Wno-deprecated-declarations
 endif
 
+CXXFLAGS += $(WARNING_CONFIG) 
 CXXFLAGS += $(INCDIR)
 
 libs := ./3rd/hiredis/libhiredis.a

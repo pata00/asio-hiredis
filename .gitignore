@@ -8,3 +8,5 @@ tests/bench_pool
 tests/test_client
 tests/test_dev
 tests/test_pool
+*.plist
+*.dSYM

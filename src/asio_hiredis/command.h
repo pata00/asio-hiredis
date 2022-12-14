@@ -17,7 +17,7 @@ namespace ahedis {
             char* data = nullptr;
             auto length = redisFormatCommand(&data, format, std::forward<Args>(args)...);
             assert(length > 0);
-            return std::make_shared<command>(std::move(command(data, length)));
+            return std::make_shared<command>(command(data, length));
         }
 
         ~command() {

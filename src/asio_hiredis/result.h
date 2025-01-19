@@ -78,6 +78,10 @@ namespace ahedis {
             return reply_->type == REDIS_REPLY_INTEGER;
         }
 
+        bool is_string() const {
+            return reply_->type == REDIS_REPLY_STRING;
+        }
+
         void debug_print() const {
             auto _print = [](redisReply* reply) {
                 if (reply->type == REDIS_REPLY_ERROR) {

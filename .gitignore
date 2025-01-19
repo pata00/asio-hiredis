@@ -2,6 +2,7 @@
 *.d
 *.a
 *.so
+tests/bench_client_callback_st
 tests/bench_client_callback
 tests/bench_client_coroutine
 tests/bench_pool

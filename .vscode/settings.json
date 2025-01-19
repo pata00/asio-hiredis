@@ -76,7 +76,18 @@
         "netfwd": "cpp",
         "unordered_set": "cpp",
         "shared_mutex": "cpp",
-        "regex": "cpp"
+        "regex": "cpp",
+        "hash_map": "cpp",
+        "hash_set": "cpp",
+        "charconv": "cpp",
+        "forward_list": "cpp",
+        "format": "cpp",
+        "numbers": "cpp",
+        "semaphore": "cpp",
+        "span": "cpp",
+        "stdfloat": "cpp",
+        "text_encoding": "cpp",
+        "valarray": "cpp"
     },
     "files.exclude": {
         "**/test_asio_redis": true,

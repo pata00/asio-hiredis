@@ -1,4 +1,4 @@
-libs := ../3rd/hiredis/libhiredis.a -lfmt
+libs := -lhiredis -lfmt
 
 srcs := $(wildcard *.cpp)
 
@@ -6,10 +6,10 @@ depends := $(patsubst %.cpp, %.d, $(srcs))
 
 targets := $(patsubst %.cpp, %, $(srcs))
 
-CXXFLAGS := -Wall -Wextra -Wno-unused-variable -Wno-unused-parameter -Wno-unused-lambda-capture -Wno-deprecated-declarations -std=c++20 -I ../3rd/asio/asio/include -I ../src -I /usr/local/include/hiredis -pthread -O0 -g
+CXXFLAGS := -Wall -Wextra -Wno-unused-variable -Wno-unused-parameter -Wno-unused-lambda-capture -Wno-deprecated-declarations -std=c++20 -I /usr/include/asio -I ../src -I /usr/include/hiredis -pthread -O2 -g
 
 ifeq ($(shell uname -s), Linux)
-        CXX=g++-10
+        CXX=g++
         CXXFLAGS += -fcoroutines
 endif
 

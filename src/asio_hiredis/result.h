@@ -74,6 +74,10 @@ namespace ahedis {
             return reply_->type == REDIS_REPLY_ARRAY;
         }
 
+        bool is_integer() const {
+            return reply_->type == REDIS_REPLY_INTEGER;
+        }
+
         void debug_print() const {
             auto _print = [](redisReply* reply) {
                 if (reply->type == REDIS_REPLY_ERROR) {

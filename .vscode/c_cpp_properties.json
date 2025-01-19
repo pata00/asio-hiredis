@@ -4,13 +4,15 @@
             "name": "Linux",
             "includePath": [
                 "${workspaceFolder}/src",
-                "${workspaceFolder}/3rd/asio/asio/include",
-                "${workspaceFolder}/3rd/hiredis"
+                //"${workspaceFolder}/3rd/asio/asio/include",
+                "/usr/include/asio",
+                //"${workspaceFolder}/3rd/hiredis"
+                "/usr/include/hiredis"
             ],
             "defines": [
                 
             ],
-            "compilerPath": "/usr/bin/g++-10",
+            "compilerPath": "/usr/bin/g++",
             "cppStandard": "c++20",
             "compilerArgs": [
                 "-fcoroutines"

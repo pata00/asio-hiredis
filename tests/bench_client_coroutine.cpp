@@ -32,16 +32,26 @@ asio::awaitable<void> bench_client(asio::io_context& io, int coro_id) {
     auto [status, err] = co_await client->async_connect("127.0.0.1", 6379, asio::use_awaitable);
     assert(status == 0);
 
-    auto cmd = ahedis::command::create("get a");
+    // delete last value
+    {
+        auto cmd = ahedis::command::create("del BENCH_CLIENT_CB_CNT");
+        auto [reply] = co_await client->async_exec(cmd, use_nothrow_awaitable);
+        assert(reply);
+        assert(reply.is_integer());
+    }
+
+    auto cmd = ahedis::command::create("incr BENCH_CLIENT_CB_CNT");
     if (coro_id == 0) {
         t0 = std::chrono::steady_clock::now();
         t1 = t0;
     }
 
+    int finished_cnt = 0;
+
     while (true) {
         auto [reply] = co_await client->async_exec(cmd, use_nothrow_awaitable);
         assert(reply);
-        assert(reply.as_str() == "1");
+        assert(reply.as_longlong() == ++finished_cnt);
         run_statics.at(coro_id)++;
         cur_size++;
 

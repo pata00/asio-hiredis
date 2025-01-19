@@ -1,9 +1,11 @@
+#include "helper.h"
+
 #include <asio/as_tuple.hpp>
+#include <asio/this_coro.hpp>
 #include <fmt/format.h>
 #include <shared_mutex>
 
 #include "asio_hiredis.hpp"
-#include "helper.h"
 
 constexpr auto use_nothrow_awaitable = asio::as_tuple(asio::use_awaitable);
 
@@ -11,7 +13,6 @@ bool quit = false;
 void handle_sigint(int signum) {
     printf("Received SIGINT (Ctrl+C)\n");
     quit = true;
-    // 在这里可以执行一些清理操作
 }
 
 asio::awaitable<void> bench_client(asio::io_context& io) {
@@ -19,37 +20,12 @@ asio::awaitable<void> bench_client(asio::io_context& io) {
     auto [status, err] = co_await client->async_connect("127.0.0.1", 6379, use_nothrow_awaitable);
     assert(status == 0);
 
-    // delete last value
-    {
-        auto cmd = ahedis::command::create("del %s", BENCH_KEY);
+    auto cmd = ahedis::command::create("incr %s", BENCH_KEY);
+
+    while (!quit) {
         auto [reply] = co_await client->async_exec(cmd, use_nothrow_awaitable);
         assert(reply);
         assert(reply.is_integer());
-    }
-
-    auto cmd = ahedis::command::create("incr %s", BENCH_KEY);
-
-    int querying_cnt = 0;
-    long long finished_cnt = 0ll;
-
-    while (!quit) {
-        if (querying_cnt < 4096) {
-            client->async_exec(cmd, [&querying_cnt, &finished_cnt](const ahedis::result& reply) {
-                assert(reply);
-                assert(reply.as_longlong() == ++finished_cnt);
-                --querying_cnt;
-            });
-            ++querying_cnt;
-
-        } else {
-            co_await sleep_for(client->io(), 1);
-            continue;
-        }
-    }
-
-    while (querying_cnt != 0) {
-        // co_await asio::post(client->strand(), asio::use_awaitable); 无法实现等待flush，因为时间并不挂在strand上，只是回调那一刻才出现在strand上
-        co_await sleep_for(client->io(), 100);
     }
 
     co_await client->async_stop(asio::use_awaitable);
@@ -82,14 +58,46 @@ asio::awaitable<void> monitor_client(asio::io_context& io) {
     co_await client->async_stop(asio::use_awaitable);
 }
 
-// bench result:
-// avg: 1.22 M/s  cur: 1.23 M/s  total: 342.88 M
+asio::awaitable<void> async_main(int coroutine_count) {
+    auto executor = co_await asio::this_coro::executor;
+    auto& context = executor.context();
+    auto* io_ptr = static_cast<asio::io_context*>(&context);
+    auto& io = *io_ptr;
+
+    // init redis
+    {
+        auto client = ahedis::client::create(io);
+        auto [status, err] = co_await client->async_connect("127.0.0.1", 6379, asio::use_awaitable);
+        assert(status == 0);
+
+        auto cmd = ahedis::command::create("del %s", BENCH_KEY);
+        auto [reply] = co_await client->async_exec(cmd, use_nothrow_awaitable);
+        assert(reply);
+        assert(reply.is_integer());
+
+        co_await client->async_stop(asio::use_awaitable);
+    }
+
+    for (int i = 0; i < coroutine_count; ++i) {
+        asio::co_spawn(io, bench_client(io), asio::detached);
+    }
+    asio::co_spawn(executor, monitor_client(io), asio::detached);
+}
+
 int main(int argc, char* argv[]) {
+    int coroutine_count = 1;
+    if (argc >= 2) {
+        int val = std::atoi(argv[1]);
+        if (val > 0) {
+            coroutine_count = val;
+        }
+    }
+    printf("run as coroutine_count:%d\n", coroutine_count);
+
     asio::io_context io;
     signal(SIGPIPE, SIG_IGN);
     signal(SIGINT, handle_sigint);
-    asio::co_spawn(io, bench_client(io), asio::detached);
-    asio::co_spawn(io, monitor_client(io), asio::detached);
+    asio::co_spawn(io, async_main(coroutine_count), asio::detached);
     io.run();
     return 0;
 }

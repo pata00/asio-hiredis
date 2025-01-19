@@ -30,13 +30,11 @@ asio::awaitable<void> bench_client(asio::io_context& io) {
     auto cmd = ahedis::command::create("incr %s", BENCH_KEY);
 
     int querying_cnt = 0;
-    long long finished_cnt = 0ll;
 
     while (!quit) {
         if (querying_cnt < 4096) {
-            client->async_exec(cmd, [&querying_cnt, &finished_cnt](const ahedis::result& reply) {
+            client->async_exec(cmd, [&querying_cnt](const ahedis::result& reply) {
                 assert(reply);
-                assert(reply.as_longlong() == ++finished_cnt);
                 --querying_cnt;
             });
             ++querying_cnt;
@@ -82,14 +80,49 @@ asio::awaitable<void> monitor_client(asio::io_context& io) {
     co_await client->async_stop(asio::use_awaitable);
 }
 
-// bench result:
-// avg: 1.22 M/s  cur: 1.23 M/s  total: 342.88 M
 int main(int argc, char* argv[]) {
-    asio::io_context io;
+    int thread_count = 1;
+
+    if (argc >= 2) {
+        int val = std::atoi(argv[1]);
+        if (val > 0) {
+            thread_count = val;
+        }
+    }
+
+    printf("run as thread_count:%d\n", thread_count);
+
     signal(SIGPIPE, SIG_IGN);
     signal(SIGINT, handle_sigint);
-    asio::co_spawn(io, bench_client(io), asio::detached);
-    asio::co_spawn(io, monitor_client(io), asio::detached);
-    io.run();
+
+    std::vector<std::thread> all_threads;
+    all_threads.reserve(thread_count + 1);
+
+    for (int i = 0; i < thread_count; ++i) {
+        all_threads.emplace_back([] {
+            try {
+                asio::io_context io;
+                asio::co_spawn(io, bench_client(io), asio::detached);
+                io.run();
+            } catch (...) {
+                assert(false);
+            }
+        });
+    }
+
+    all_threads.emplace_back([] {
+        try {
+            asio::io_context io;
+            asio::co_spawn(io, monitor_client(io), asio::detached);
+            io.run();
+        } catch (...) {
+            assert(false);
+        }
+    });
+
+    for (auto& t : all_threads) {
+        t.join();
+    }
+
     return 0;
 }

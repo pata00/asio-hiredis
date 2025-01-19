@@ -3,8 +3,9 @@
 *.a
 *.so
 tests/bench_client_callback_st
-tests/bench_client_callback
-tests/bench_client_coroutine
+tests/bench_client_callback_mt
+tests/bench_client_coroutine_st
+tests/bench_client_coroutine_mt
 tests/bench_pool
 tests/test_client
 tests/test_dev

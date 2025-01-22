@@ -444,7 +444,7 @@ namespace ahedis {
             // TODO 是否只有异常断开会触发此错误
             if (status == REDIS_OK) {
                 socket_.async_wait(asio::ip::tcp::socket::wait_error, asio::bind_executor(strand_, [this, self = shared_from_this()](asio::error_code ec) {
-					(void)this;
+                                       (void)this;
                                        ASIO_HIREDIS_CLIENT_DEBUG(debug_object_id_, "END===========wait_error %d, %s\n", ec.value(), ec.message().c_str());
                                        // assert(false);
                                    }));
@@ -454,7 +454,12 @@ namespace ahedis {
         void on_disconnect_cb(int status) {
             assert(has_flag(status_flag::ev_connected));
             set_flag(status_flag::ev_connected, false);
-            socket_.release();
+            try {
+                socket_.release();
+            } catch (...) {
+                // for windows socket release error
+                // https://github.com/chriskohlhoff/asio/issues/1097
+            }
             timer_.cancel();
 
             std::string msg;

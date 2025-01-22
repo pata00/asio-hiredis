@@ -5,6 +5,7 @@
 #include <cassert>
 #include <iostream>
 #include <string_view>
+#include <vector>
 
 #include "hiredis.h"
 
@@ -59,6 +60,21 @@ namespace ahedis {
             assert(reply_->type == REDIS_REPLY_ARRAY);
             assert(reply_->elements == 2);
             return {std::string_view(reply_->element[0]->str, reply_->element[0]->len), std::string_view(reply_->element[1]->str, reply_->element[1]->len)};
+        }
+
+        std::vector<std::pair<std::string_view, std::string_view>> as_pairs_str() const {
+            assert(reply_->type == REDIS_REPLY_ARRAY);
+            std::vector<std::pair<std::string_view, std::string_view>> ret;
+            ret.reserve(reply_->elements);
+
+            for (size_t i = 0; i < reply_->elements; i += 2) {
+                auto key_element = reply_->element[i];
+                auto value_element = reply_->element[i + 1];
+                assert(key_element->type == REDIS_REPLY_STRING);
+                assert(value_element->type == REDIS_REPLY_STRING);
+                ret.emplace_back(std::string_view(key_element->str, key_element->len), std::string_view(value_element->str, value_element->len));
+            }
+            return ret;
         }
 
         std::string_view as_error() const {

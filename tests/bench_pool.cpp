@@ -48,7 +48,7 @@ asio::awaitable<void> test_pool_exec(asio::io_context& io, ahedis::pool& pool, i
         if (!reply)
             continue;
         assert(reply);
-        assert(reply.as_str() == "1");
+        assert(reply.value<std::string_view>() == "1");
         run_statics.at(coro_id)++;
         cur_size++;
 

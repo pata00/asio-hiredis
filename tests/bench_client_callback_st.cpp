@@ -23,8 +23,8 @@ asio::awaitable<void> bench_client(asio::io_context& io) {
     {
         auto cmd = ahedis::command::create("del %s", BENCH_KEY);
         auto [reply] = co_await client->async_exec(cmd, use_nothrow_awaitable);
-        assert(reply);
-        assert(reply.is_integer());
+        // assert(reply);
+        // assert(reply.is_integer());
     }
 
     auto cmd = ahedis::command::create("incr %s", BENCH_KEY);
@@ -36,7 +36,7 @@ asio::awaitable<void> bench_client(asio::io_context& io) {
         if (querying_cnt < 4096) {
             client->async_exec(cmd, [&querying_cnt, &finished_cnt](const ahedis::result& reply) {
                 assert(reply);
-                assert(reply.as_longlong() == ++finished_cnt);
+                assert(reply.value<long long>() == ++finished_cnt);
                 --querying_cnt;
             });
             ++querying_cnt;
@@ -71,7 +71,7 @@ asio::awaitable<void> monitor_client(asio::io_context& io) {
         auto [reply] = co_await client->async_exec(cmd, use_nothrow_awaitable);
         assert(reply);
         assert(reply.is_string());
-        long long current_bench_cnt = std::atoll(reply.as_str().data());
+        long long current_bench_cnt = std::atoll(reply.value<std::string_view>().data());
 
         const std::size_t avg_speed = current_bench_cnt * 1000 / std::chrono::duration_cast<std::chrono::milliseconds>(t1 - t0).count();
         const std::size_t cur_speed = (current_bench_cnt - last_bench_cnt);

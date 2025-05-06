@@ -47,7 +47,7 @@ asio::awaitable<void> monitor_client(asio::io_context& io) {
         auto [reply] = co_await client->async_exec(cmd, use_nothrow_awaitable);
         assert(reply);
         assert(reply.is_string());
-        long long current_bench_cnt = std::atoll(reply.as_str().data());
+        long long current_bench_cnt = std::atoll(reply.value<std::string_view>().data());
 
         const std::size_t avg_speed = current_bench_cnt * 1000 / std::chrono::duration_cast<std::chrono::milliseconds>(t1 - t0).count();
         const std::size_t cur_speed = (current_bench_cnt - last_bench_cnt);

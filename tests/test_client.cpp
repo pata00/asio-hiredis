@@ -34,7 +34,7 @@ asio::awaitable<void> test_client1(asio::io_context& io) {
             co_await client->async_stop(asio::use_awaitable);
             co_return;
         }
-        assert(res.as_str() == "1");
+        assert(res.value<std::string_view>() == "1");
     }
 
     {
@@ -46,7 +46,7 @@ asio::awaitable<void> test_client1(asio::io_context& io) {
             co_await client->async_stop(asio::use_awaitable);
             co_return;
         }
-        assert(res.as_longlong() >= 0);
+        assert(res.value<long long>() >= 0);
     }
 
     co_await client->async_stop(asio::use_awaitable);
@@ -86,7 +86,7 @@ void test_client2(asio::io_context& io) {
                     });
                     return;
                 }
-                assert(res2.as_str() == "2");
+                assert(res2.value<std::string_view>() == "2");
 
                 client->async_stop([client](int status, const std::string& err) {
                     assert(status == 0);

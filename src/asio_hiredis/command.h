@@ -100,5 +100,5 @@ namespace ahedis {
     //     co_return true;
     // }
 
-} // namespace asio_hiredis
+} // namespace ahedis
 #endif

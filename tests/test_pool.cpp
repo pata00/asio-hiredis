@@ -17,7 +17,7 @@ asio::awaitable<void> test_exec(asio::io_context& io, ahedis::pool& pool) {
 
     auto cmd2 = ahedis::command::create("get a");
     auto res2 = co_await pool.async_exec(cmd2);
-    assert(res2.as_str() == "1");
+    assert(res2.value<std::string_view>() == "1");
 }
 
 asio::awaitable<void> test_pool_conn(asio::io_context& io, ahedis::pool& pool) {
@@ -25,7 +25,7 @@ asio::awaitable<void> test_pool_conn(asio::io_context& io, ahedis::pool& pool) {
     auto [res1] = co_await conn->get()->async_exec(ahedis::command::create("set a 1"), use_nothrow_awaitable);
     assert(res1.as_status() == "OK");
     auto [res2] = co_await conn->get()->async_exec(ahedis::command::create("get a"), use_nothrow_awaitable);
-    assert(res2.as_str() == "1");
+    assert(res2.value<std::string_view>() == "1");
 }
 
 asio::awaitable<void> shutdown(asio::io_context& io, ahedis::pool& pool) {

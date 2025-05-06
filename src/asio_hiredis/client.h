@@ -517,7 +517,7 @@ namespace ahedis {
     };
 
 #ifdef ENABLE_ASIO_HIREDIS_CLIENT_DEBUG
-    static const int pos = (size_t) & ((client*)0)->debug_object_id_;
+    static const int pos = (size_t)&((client*)0)->debug_object_id_;
     constexpr const int base_size = sizeof(std::shared_ptr<client>);
     static_assert(pos == base_size);
     static_assert(base_size == 16);

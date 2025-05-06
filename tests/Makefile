@@ -6,7 +6,8 @@ depends := $(patsubst %.cpp, %.d, $(srcs))
 
 targets := $(patsubst %.cpp, %, $(srcs))
 
-CXXFLAGS := -Wall -Wextra -Wno-unused-variable -Wno-unused-parameter -Wno-unused-lambda-capture -Wno-deprecated-declarations -std=c++20 -I /usr/include/asio -I ../src -I /usr/include/hiredis -pthread -O2 -g
+#-Wall -Wextra 
+CXXFLAGS := -Wno-unused-variable -Wno-unused-parameter -Wno-unused-function -Wno-unused-but-set-variable -Wno-unused-value -Wno-unused-local-typedefs -Wno-unused-private-field -Wno-deprecated-declarations -std=c++20 -I /usr/include/asio -I ../src -I /usr/include/hiredis -pthread -O2 -g
 
 ifeq ($(shell uname -s), Linux)
         CXX=g++

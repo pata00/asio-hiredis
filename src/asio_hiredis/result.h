@@ -46,37 +46,6 @@ namespace ahedis {
             return std::string_view(reply_->str, reply_->len);
         }
 
-        std::string_view as_str() const {
-            assert(reply_->type == REDIS_REPLY_STRING);
-            return std::string_view(reply_->str, reply_->len);
-        }
-
-        long long as_longlong() const {
-            assert(reply_->type == REDIS_REPLY_INTEGER);
-            return reply_->integer;
-        }
-
-        std::pair<std::string_view, std::string_view> as_pair_str() const {
-            assert(reply_->type == REDIS_REPLY_ARRAY);
-            assert(reply_->elements == 2);
-            return {std::string_view(reply_->element[0]->str, reply_->element[0]->len), std::string_view(reply_->element[1]->str, reply_->element[1]->len)};
-        }
-
-        std::vector<std::pair<std::string_view, std::string_view>> as_pairs_str() const {
-            assert(reply_->type == REDIS_REPLY_ARRAY);
-            std::vector<std::pair<std::string_view, std::string_view>> ret;
-            ret.reserve(reply_->elements);
-
-            for (size_t i = 0; i < reply_->elements; i += 2) {
-                auto key_element = reply_->element[i];
-                auto value_element = reply_->element[i + 1];
-                assert(key_element->type == REDIS_REPLY_STRING);
-                assert(value_element->type == REDIS_REPLY_STRING);
-                ret.emplace_back(std::string_view(key_element->str, key_element->len), std::string_view(value_element->str, value_element->len));
-            }
-            return ret;
-        }
-
         std::string_view as_error() const {
             assert(reply_->type == REDIS_REPLY_ERROR);
             return std::string_view(reply_->str, reply_->len);
@@ -130,8 +99,62 @@ namespace ahedis {
         }
 
       public:
+        template <typename T>
+        T value() const;
+
+      private:
         redisReply* reply_;
     };
+
+    template <>
+    inline std::string_view result::value<std::string_view>() const {
+        assert(reply_->type == REDIS_REPLY_STRING);
+        return std::string_view(reply_->str, reply_->len);
+    }
+
+    template <>
+    inline long long result::value<long long>() const {
+        assert(reply_->type == REDIS_REPLY_INTEGER);
+        return reply_->integer;
+    }
+
+    template <>
+    inline std::vector<std::string_view> result::value<std::vector<std::string_view>>() const {
+        assert(reply_->type == REDIS_REPLY_ARRAY);
+        std::vector<std::string_view> ret;
+        ret.reserve(reply_->elements);
+
+        for (size_t i = 0; i < reply_->elements; ++i) {
+            auto element = reply_->element[i];
+            assert(element->type == REDIS_REPLY_STRING);
+            ret.emplace_back(std::string_view(element->str, element->len));
+        }
+        return ret;
+    }
+
+    template <>
+    inline std::pair<std::string_view, std::string_view> result::value<std::pair<std::string_view, std::string_view>>() const {
+        assert(reply_->type == REDIS_REPLY_ARRAY);
+        assert(reply_->elements == 2);
+        return {std::string_view(reply_->element[0]->str, reply_->element[0]->len), std::string_view(reply_->element[1]->str, reply_->element[1]->len)};
+    }
+
+    template <>
+    inline std::vector<std::pair<std::string_view, std::string_view>> result::value<std::vector<std::pair<std::string_view, std::string_view>>>() const {
+        assert(reply_->type == REDIS_REPLY_ARRAY);
+        std::vector<std::pair<std::string_view, std::string_view>> ret;
+        ret.reserve(reply_->elements);
+
+        for (size_t i = 0; i < reply_->elements; i += 2) {
+            auto key_element = reply_->element[i];
+            auto value_element = reply_->element[i + 1];
+            assert(key_element->type == REDIS_REPLY_STRING);
+            assert(value_element->type == REDIS_REPLY_STRING);
+            ret.emplace_back(std::string_view(key_element->str, key_element->len), std::string_view(value_element->str, value_element->len));
+        }
+        return ret;
+    }
+
 } // namespace ahedis
 
 #endif

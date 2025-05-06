@@ -1,47 +1,47 @@
 #include "asio_hiredis.hpp"
+#include "helper.h"
 
-void test_client1(asio::io_context& io) {
+constexpr auto use_nothrow_awaitable = asio::as_tuple(asio::use_awaitable);
+
+bool quit = false;
+void handle_sigint(int signum) {
+    printf("Received SIGINT (Ctrl+C)\n");
+    quit = true;
+    // 在这里可以执行一些清理操作
+}
+
+asio::awaitable<void> load_redis_ticks(std::shared_ptr<ahedis::client>& client) {
+    auto cmd = ahedis::command::create("HGETALL ALL_TICKS");
+    auto [res] = co_await client->async_exec(cmd, use_nothrow_awaitable);
+    assert(!res.has_error());
+    for (auto const& [k, v] : res.value<std::vector<std::pair<std::string_view, std::string_view>>>()) {
+    }
+    // res.debug_print();
+    co_return;
+}
+
+asio::awaitable<void> async_main(asio::io_context& io) {
     auto client = ahedis::client::create(io);
+    auto [status, err] = co_await client->async_connect("192.168.2.12", 6379, use_nothrow_awaitable);
+    assert(status == 0);
 
-    client->async_connect("127.0.0.1", 6379, [client](int status, const std::string& err) {
-        if (status != 0) {
-            printf("test_client2 async_connect err = %s\n", err.c_str());
-            return;
-        }
-        assert(status == 0);
+    co_await load_redis_ticks(client);
 
-        auto cmd1 = ahedis::command::create("blpop abc 1");
-        client->async_exec(cmd1, [client](const ahedis::result& res1) {
-            if (!res1) {
-                return;
-            }
-            res1.debug_print();
-            assert(res1.is_nil());
-            // client->async_stop([client](int status, const std::string& err) {
-            //     assert(status == 0);
-            // });
-            return;
+    while (!quit) {
+        co_await sleep_for(io, 1000);
+        break;
+    }
 
-            // if (res1->has_error()) {
-            //     printf("test_client2 async_exec cmd1 err = %s\n", res1->as_error().data());
-            //     client->async_stop([client](int status, const std::string& err) {
-            //         assert(status == 0);
-            //     });
-            //     return;
-            // }
-            // assert(res1->as_status() == "OK");
-        });
-    });
+    printf("before stop\n");
+    co_await client->async_stop(asio::use_awaitable);
+    printf("after stop\n");
 }
 
 int main(int argc, char* argv[]) {
-    try {
-        asio::io_context io;
-        signal(SIGPIPE, SIG_IGN);
-        test_client1(io);
-        // test_client2(io);
-        io.run();
-    } catch (...) {
-        assert(false);
-    }
+    asio::io_context io;
+    signal(SIGPIPE, SIG_IGN);
+    signal(SIGINT, handle_sigint);
+    asio::co_spawn(io, async_main(io), asio::detached);
+    io.run();
+    return 0;
 }

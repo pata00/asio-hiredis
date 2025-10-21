@@ -87,16 +87,22 @@
         "span": "cpp",
         "stdfloat": "cpp",
         "text_encoding": "cpp",
-        "valarray": "cpp"
+        "valarray": "cpp",
+        "csetjmp": "cpp",
+        "queue": "cpp",
+        "stack": "cpp"
     },
     "files.exclude": {
         "**/test_asio_redis": true,
         "**/.*": false,
+        "**/*.d": true,
         "tests/bench_pool": true,
-        "tests/bench_client_coroutine": true,
+        "tests/bench_client_coroutine_mt": true,
+        "tests/bench_client_coroutine_st": true,
         "tests/test_pool": true,
         "tests/test_client": true,
-        "tests/bench_client_callback": true,
+        "tests/bench_client_callback_mt": true,
+        "tests/bench_client_callback_st": true,
         "tests/test_dev": true,
         "*.a": true,
         "*.so": true

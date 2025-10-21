@@ -15,6 +15,8 @@
 #include <vector>
 
 #include "asio.hpp"
+#include "asio/experimental/awaitable_operators.hpp"
+#include "asio/experimental/concurrent_channel.hpp"
 #include "hiredis.h"
 #if HIREDIS_MAJOR >= 1 && HIREDIS_MINOR >= 1
 #include "async.h"
@@ -40,6 +42,7 @@ namespace ahedis {
         using connect_resume_cb = asio::any_completion_handler<void(int, std::string)>;
         using disconnect_resume_cb = asio::any_completion_handler<void(int, std::string)>;
         using exec_resume_cb = asio::any_completion_handler<void(ahedis::result)>;
+        using subscribe_msg_queue = asio::experimental::concurrent_channel<void(asio::error_code, ahedis::result)>;
 
       public:
         enum status_flag : uint32_t {
@@ -280,6 +283,72 @@ namespace ahedis {
                 token);
         }
 
+        // 一个正在做 SUBSCRIBE 的 hiredis 客户端（连接）不能同时执行普通的 GET / SET / HGETALL 等命令。
+        template <typename CompletionToken>
+        auto async_subscribe(std::shared_ptr<ahedis::command> cmd, CompletionToken&& token) {
+            assert(cmd->is_subscribe_cmd());
+            assert(execute_resume_cb_queue_.empty());
+            return asio::async_initiate<CompletionToken, void(bool)>(
+                [this, self = shared_from_this(), cmd = std::move(cmd)](auto handler) {
+                    asio::post(strand_, [this, self = std::move(self), cmd = std::move(cmd), handler = std::move(handler)]() mutable {
+                        ASIO_HIREDIS_CLIENT_DEBUG(debug_object_id_, "async_subscribe initiate\n");
+                        if (!has_flag(status_flag::ev_connected)) {
+                            ASIO_HIREDIS_CLIENT_DEBUG(debug_object_id_, "start subscribe but conn status error:%x...\n", status_bits_);
+                            std::move(handler)(false);
+                            return;
+                        }
+
+                        // assert(!subscribe_resume_cb_);
+                        // subscribe_resume_cb_ = std::make_shared<exec_resume_cb>([handler = std::move(handler)](ahedis::result arg) mutable {
+                        //     std::move(handler)(std::move(arg));
+                        // });
+
+                        ASIO_HIREDIS_CLIENT_DEBUG(debug_object_id_, "start real subscribe...\n");
+                        last_use_time_ = std::chrono::steady_clock::now();
+                        void* privdata = static_cast<void*>(this);
+                        assert(privdata != nullptr);
+
+                        auto ret = redisAsyncFormattedCommand(
+                            ac_,
+                            [](redisAsyncContext* c, void* r, void* privdata) {
+                                auto this_ = static_cast<ahedis::client*>(privdata);
+                                this_->on_subscribe_cb(r);
+                            },
+                            privdata, cmd->data(), cmd->length());
+
+                        if (ret != REDIS_OK) {
+                            ASIO_HIREDIS_CLIENT_DEBUG(debug_object_id_, "start real subscribe failed\n");
+                            std::move(handler)(false);
+                        } else {
+                            ASIO_HIREDIS_CLIENT_DEBUG(debug_object_id_, "start real subscribe success\n");
+                            std::move(handler)(true);
+                        }
+                    });
+                },
+                token);
+        }
+
+        // 监听订阅消息，支持回调和co_await方式调用
+        template <typename CompletionToken>
+        auto listen_msg(CompletionToken&& token) {
+            return asio::async_initiate<CompletionToken, void(ahedis::result)>(
+                [this, self = shared_from_this()](auto handler) {
+                    // 从消息队列中异步接收消息
+                    sub_msgs.async_receive([this, handler = std::move(handler)](asio::error_code ec, ahedis::result result) mutable {
+                        if (ec) {
+                            // 如果有错误，创建一个错误的result
+                            ahedis::result error_result(nullptr);
+                            std::move(handler)(std::move(error_result));
+                        } else {
+                            ASIO_HIREDIS_CLIENT_DEBUG(debug_object_id_, "listen_msg cb0\n");
+                            std::move(handler)(std::move(result));
+                            ASIO_HIREDIS_CLIENT_DEBUG(debug_object_id_, "listen_msg cb1\n");
+                        }
+                    });
+                },
+                token);
+        }
+
         template <typename CompletionToken>
         auto async_stop(CompletionToken&& token) {
             return asio::async_initiate<CompletionToken, void(int, std::string)>(
@@ -289,6 +358,7 @@ namespace ahedis {
                         assert(!has_flag(status_flag::ev_enable_disconnect));
                         set_flag(status_flag::ev_enable_disconnect, true);
                         assert(ac_ != nullptr);
+                        ASIO_HIREDIS_CLIENT_DEBUG(debug_object_id_, "async_stop initiate2\n");
 
                         if (!has_flag(status_flag::ev_connected) && !has_flag(status_flag::ev_enable_connect)) {
                             ASIO_HIREDIS_CLIENT_DEBUG(debug_object_id_, "async_stop but aleady disconnected...\n");
@@ -299,8 +369,10 @@ namespace ahedis {
                         }
 
                         disconnect_cb_ = std::make_shared<disconnect_resume_cb>([handler = std::move(handler)](int code, std::string msg) mutable {
+                            printf("will call disconnect_cb_...\n");
                             std::move(handler)(code, std::move(msg));
                         });
+                        ASIO_HIREDIS_CLIENT_DEBUG(debug_object_id_, "async_stop initiate3\n");
 
                         stop();
                     });
@@ -354,7 +426,8 @@ namespace ahedis {
             , timer_(io)
             , ac_(nullptr)
             , status_bits_(status_flag::init)
-            , last_use_time_(std::chrono::steady_clock::now()) {
+            , last_use_time_(std::chrono::steady_clock::now())
+            , sub_msgs(io, 1024 * 16) {
 #ifdef ENABLE_ASIO_HIREDIS_CLIENT_DEBUG
             debug_object_id_ = ++s_current;
 #endif
@@ -402,10 +475,13 @@ namespace ahedis {
         }
 
         void stop() {
+            printf("before socket cancel...\n");
             socket_.cancel();
+            printf("stop....");
             redisAsyncDisconnect(ac_); // 内部会调用 cleanup， 然后再调用disconnectcb
             connect_cb_.reset();
             disconnect_cb_.reset();
+            printf("here\n");
         }
 
         void on_connect_cb(int status) {
@@ -495,6 +571,29 @@ namespace ahedis {
             });
         }
 
+        // 在这个回调中把结果存储起来
+        void on_subscribe_cb(void* r) {
+            ASIO_HIREDIS_CLIENT_DEBUG(debug_object_id_, "on_subscribe_cb:%p\n", r);
+            ahedis::result arg(static_cast<redisReply*>(r));
+            bool flag = sub_msgs.try_send(asio::error_code{}, std::move(arg));
+            assert(flag);
+            // if (arg) {
+            //     arg.debug_print();
+            // }
+            // ASIO_HIREDIS_CLIENT_DEBUG(debug_object_id_, "subcribe cb with return :%p\n", r);
+            // assert(subscribe_resume_cb_ != nullptr);
+
+            // auto& handler_ptr = subscribe_resume_cb_;
+
+            // asio::post(strand_, [handler_ptr, r] {
+            //     ahedis::result arg(static_cast<redisReply*>(r));
+            //     (*handler_ptr)(std::move(arg));
+
+            //     // ahedis::result arg2(static_cast<redisReply*>(nullptr));
+            //     // (*handler_ptr)(std::move(arg2));
+            // });
+        }
+
 #ifdef ENABLE_ASIO_HIREDIS_CLIENT_DEBUG
       public:
         int debug_object_id_;
@@ -514,6 +613,7 @@ namespace ahedis {
         std::shared_ptr<connect_resume_cb> connect_cb_;
         std::shared_ptr<disconnect_resume_cb> disconnect_cb_;
         std::deque<std::shared_ptr<exec_resume_cb>> execute_resume_cb_queue_;
+        subscribe_msg_queue sub_msgs;
     };
 
 #ifdef ENABLE_ASIO_HIREDIS_CLIENT_DEBUG
